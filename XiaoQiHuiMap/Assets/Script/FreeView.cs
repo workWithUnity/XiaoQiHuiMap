@@ -1,126 +1,92 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+//定义鼠标按键枚举  
+enum MouseButton
+{
+    //鼠标左键  
+    MouseButton_Left = 0,
+    //鼠标右键  
+    MouseButton_Right = 1,
+    //鼠标中键  
+    MouseButton_Midle = 2
+}
+
 public class FreeView : MonoBehaviour
 {
-
-    //观察目标  
-    public Transform Target;
-    public float moveSpeed = 0.001f;
-    //观察距离  
-    private float Distance = 5F;
-
-    //旋转速度  
-    public float SpeedX = 12;
-    public float SpeedY = 12;
-
-    //角度限制  
-    private float MinLimitY = -180;
-    private float MaxLimitY = 180;
-
-    //旋转角度  
-    private float mX = 0.0F;
-    private float mY = 0.0F;
 
     //鼠标缩放距离最值  
     public float MaxDistance = -0.4f;
     public float MinDistance = -4f;
     //鼠标缩放速率  
-    private float ZoomSpeed = 2F;
+    public float ZoomSpeed = 2F;
 
-    //是否启用差值  
-    public bool isNeedDamping = true;
-    //速度  
-    public float Damping = 10F;
+    //观察目标  
+    private Transform Target;
 
-    //存储角度的四元数  
-    private Quaternion mRotation;
-
-    //定义鼠标按键枚举  
-    private enum MouseButton
-    {
-        //鼠标左键  
-        MouseButton_Left = 0,
-        //鼠标右键  
-        MouseButton_Right = 1,
-        //鼠标中键  
-        MouseButton_Midle = 2
-    }
-
-    //相机移动速度  
-    private float MoveSpeed = 5.0F;
     //屏幕坐标  
     private Vector3 mScreenPoint;
     //坐标偏移  
     private Vector3 mOffset;
 
+    private Camera camera;
+
+    private Vector3 _vec3TargetScreenSpace;// 目标物体的屏幕空间坐标  
+    private Vector3 _vec3TargetWorldSpace;// 目标物体的世界空间坐标  
+    private Vector3 _vec3MouseScreenSpace;// 鼠标的屏幕空间坐标  
+    private Vector3 _vec3Offset;// 偏移 
+
+    private int downIndex = 0;
+    private float Distance;
     void Awake()
     {
-        Distance = this.Target.transform.position.z;
+        Target = GameObject.Find("Cube").transform;
+        camera = this.gameObject.GetComponent<Camera>();
+        Distance = camera.orthographicSize;
+
     }
 
-    void Start()
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN ||UNITY_WEBGL
+    void Update()
     {
-        //初始化旋转角度  
-        mX = transform.position.x;
-        mY = transform.position.y;
-    }
-#if UNITY_EDITOR || UNITY_STANDALONE_WIN
-    void LateUpdate()
-    {
-        //鼠标右键旋转  
-        if (Target != null && Input.GetMouseButton((int)MouseButton.MouseButton_Left))
-        {
-            //获取鼠标输入  
-            mX = Input.GetAxis("Mouse X") * SpeedX * 0.02F;
-            mY = Input.GetAxis("Mouse Y") * SpeedY * 0.02F;
-            //范围限制  
-            mY = ClampAngle(mY, MinLimitY, MaxLimitY);
-            //计算旋转  
-
-            Vector3 mPosition = new Vector3(Target.position.x - mX, Target.position.y - mY, Target.position.z);
-            if (isNeedDamping)
+            if (Input.GetMouseButton((int)MouseButton.MouseButton_Left))
             {
-                transform.position = Vector3.Lerp(transform.position, mPosition, Time.deltaTime * Damping);
+                if (downIndex++ == 0)
+                {
+                    // 把目标物体的世界空间坐标转换到它自身的屏幕空间坐标 
+                    _vec3TargetScreenSpace = Camera.main.WorldToScreenPoint(Target.position);
+
+                    // 存储鼠标的屏幕空间坐标（Z值使用目标物体的屏幕空间坐标） 
+                    _vec3MouseScreenSpace = new Vector3(Input.mousePosition.x, Input.mousePosition.y, _vec3TargetScreenSpace.z);
+
+                    // 计算目标物体与鼠标物体在世界空间中的偏移量 
+                    _vec3Offset = Target.position - Camera.main.ScreenToWorldPoint(_vec3MouseScreenSpace);
+                }
+
+                // 存储鼠标的屏幕空间坐标（Z值使用目标物体的屏幕空间坐标）
+                _vec3MouseScreenSpace = new Vector3(Input.mousePosition.x, Input.mousePosition.y, _vec3TargetScreenSpace.z);
+
+                // 把鼠标的屏幕空间坐标转换到世界空间坐标（Z值使用目标物体的屏幕空间坐标），加上偏移量，以此作为目标物体的世界空间坐标
+                _vec3TargetWorldSpace = Camera.main.ScreenToWorldPoint(_vec3MouseScreenSpace) + _vec3Offset;
+
+                // 更新目标物体的世界空间坐标 
+                Target.position = _vec3TargetWorldSpace;
             }
             else
             {
-                transform.position = mPosition;
+                downIndex = 0;
             }
-        }
 
-        //鼠标中键平移  
-        
-        if (Input.GetAxis("Mouse ScrollWheel") != 0)
-        {
-            //鼠标滚轮缩放  
-            Distance -= Input.GetAxis("Mouse ScrollWheel") * ZoomSpeed;
-
-            Distance = Mathf.Clamp(Distance, MinDistance, MaxDistance);
-
-            //重新计算位置  
-            //Vector3 mPosition = mRotation * new Vector3(0.0F, 0.0F, -Distance) + Target.position;
-            Vector3 mPosition = new Vector3(Target.position.x, Target.position.y, Distance);
-            //设置相机的位置  
-            if (isNeedDamping)
+            //鼠标中键平移  
+            if (Input.GetAxis("Mouse ScrollWheel") != 0)
             {
-                transform.position = Vector3.Lerp(transform.position, mPosition, Time.deltaTime * Damping);
+                //鼠标滚轮缩放  
+                Distance += Input.GetAxis("Mouse ScrollWheel") * ZoomSpeed;
+                Distance = Mathf.Clamp(Distance, MinDistance, MaxDistance);
+                //设置相机视口
+                camera.orthographicSize = Distance;
             }
-            else
-            {
-                transform.position = mPosition;
-            }
-        }
-
-
     }
+
 #endif
-
-    //角度限制  
-    private float ClampAngle(float angle, float min, float max)
-    {
-        if (angle < -360) angle += 360;
-        if (angle > 360) angle -= 360;
-        return Mathf.Clamp(angle, min, max);
-    }
 }

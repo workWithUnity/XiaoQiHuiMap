@@ -281,12 +281,12 @@ extern "C" {
         }
     }
     
-    // 保存照片到相册
-    //    void _iosSaveImageToPhotosAlbum(char* base64)
-    //    {
-    //        NSString* temp = [NSString stringWithUTF8String:base64];
-    //        [IOSAlbumCameraController saveImageToPhotosAlbum:temp];
-    //    }
+    //点击小地图
+    void _iosClickMap(char* mapId)
+    {
+       NSLog(@"_iosClickMap %@",mapId);
+    }
+	
     void _iosSaveImageToPhotosAlbum(char* readAddr)
     {
         NSString* temp = [NSString stringWithUTF8String:readAddr];
